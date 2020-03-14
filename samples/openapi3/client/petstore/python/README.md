@@ -14,7 +14,7 @@ Python 2.7 and 3.4+
 ## Installation & Usage
 ### pip install
 
-If the python package is hosted on Github, you can install directly from Github
+If the python package is hosted on a repository, you can install directly using:
 
 ```sh
 pip install git+https://github.com/GIT_USER_ID/GIT_REPO_ID.git
@@ -23,7 +23,7 @@ pip install git+https://github.com/GIT_USER_ID/GIT_REPO_ID.git
 
 Then import the package:
 ```python
-import petstore_api 
+import petstore_api
 ```
 
 ### Setuptools
@@ -52,17 +52,21 @@ from petstore_api.rest import ApiException
 from pprint import pprint
 
 
-# create an instance of the API class
-api_instance = petstore_api.AnotherFakeApi(petstore_api.ApiClient(configuration))
-client = petstore_api.Client() # Client | client model
+# Defining host is optional and default to http://petstore.swagger.io:80/v2
+configuration.host = "http://petstore.swagger.io:80/v2"
+# Enter a context with an instance of the API client
+with petstore_api.ApiClient(configuration) as api_client:
+    # Create an instance of the API class
+    api_instance = petstore_api.AnotherFakeApi(api_client)
+    client = petstore_api.Client() # Client | client model
 
-try:
-    # To test special tags
-    api_response = api_instance.call_123_test_special_tags(client)
-    pprint(api_response)
-except ApiException as e:
-    print("Exception when calling AnotherFakeApi->call_123_test_special_tags: %s\n" % e)
-
+    try:
+        # To test special tags
+        api_response = api_instance.call_123_test_special_tags(client)
+        pprint(api_response)
+    except ApiException as e:
+        print("Exception when calling AnotherFakeApi->call_123_test_special_tags: %s\n" % e)
+    
 ```
 
 ## Documentation for API Endpoints
@@ -86,6 +90,7 @@ Class | Method | HTTP request | Description
 *FakeApi* | [**test_group_parameters**](docs/FakeApi.md#test_group_parameters) | **DELETE** /fake | Fake endpoint to test group parameters (optional)
 *FakeApi* | [**test_inline_additional_properties**](docs/FakeApi.md#test_inline_additional_properties) | **POST** /fake/inline-additionalProperties | test inline additionalProperties
 *FakeApi* | [**test_json_form_data**](docs/FakeApi.md#test_json_form_data) | **GET** /fake/jsonFormData | test json serialization of form data
+*FakeApi* | [**test_query_parameter_collection_format**](docs/FakeApi.md#test_query_parameter_collection_format) | **PUT** /fake/test-query-paramters | 
 *FakeClassnameTags123Api* | [**test_classname**](docs/FakeClassnameTags123Api.md#test_classname) | **PATCH** /fake_classname_test | To test class name in snake case
 *PetApi* | [**add_pet**](docs/PetApi.md#add_pet) | **POST** /pet | Add a new pet to the store
 *PetApi* | [**delete_pet**](docs/PetApi.md#delete_pet) | **DELETE** /pet/{petId} | Deletes a pet
@@ -120,10 +125,12 @@ Class | Method | HTTP request | Description
  - [ArrayTest](docs/ArrayTest.md)
  - [Capitalization](docs/Capitalization.md)
  - [Cat](docs/Cat.md)
+ - [CatAllOf](docs/CatAllOf.md)
  - [Category](docs/Category.md)
  - [ClassModel](docs/ClassModel.md)
  - [Client](docs/Client.md)
  - [Dog](docs/Dog.md)
+ - [DogAllOf](docs/DogAllOf.md)
  - [EnumArrays](docs/EnumArrays.md)
  - [EnumClass](docs/EnumClass.md)
  - [EnumTest](docs/EnumTest.md)
@@ -146,10 +153,14 @@ Class | Method | HTTP request | Description
  - [Model200Response](docs/Model200Response.md)
  - [ModelReturn](docs/ModelReturn.md)
  - [Name](docs/Name.md)
+ - [NullableClass](docs/NullableClass.md)
  - [NumberOnly](docs/NumberOnly.md)
  - [Order](docs/Order.md)
  - [OuterComposite](docs/OuterComposite.md)
  - [OuterEnum](docs/OuterEnum.md)
+ - [OuterEnumDefaultValue](docs/OuterEnumDefaultValue.md)
+ - [OuterEnumInteger](docs/OuterEnumInteger.md)
+ - [OuterEnumIntegerDefaultValue](docs/OuterEnumIntegerDefaultValue.md)
  - [Pet](docs/Pet.md)
  - [ReadOnlyFirst](docs/ReadOnlyFirst.md)
  - [SpecialModelName](docs/SpecialModelName.md)

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openapitools.codegen.*;
+import org.openapitools.codegen.meta.features.*;
 import org.openapitools.codegen.utils.ModelUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,31 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
 
     public CLibcurlClientCodegen() {
         super();
+
+        // TODO: c maintainer review
+        // Assumes that C community considers api/model header files as documentation.
+        // Generator supports Basic, OAuth, and API key explicitly. Bearer is excluded although clients are able to set headers directly.
+        modifyFeatureSet(features -> features
+                .includeDocumentationFeatures(
+                        DocumentationFeature.Readme
+                )
+                .securityFeatures(EnumSet.of(
+                        SecurityFeature.OAuth2_Implicit,
+                        SecurityFeature.BasicAuth,
+                        SecurityFeature.ApiKey
+                ))
+                .excludeParameterFeatures(
+                        ParameterFeature.Cookie
+                )
+                .includeWireFormatFeatures(
+                        WireFormatFeature.JSON,
+                        WireFormatFeature.XML
+                )
+                .excludeSchemaSupportFeatures(
+                        SchemaSupportFeature.Polymorphism,
+                        SchemaSupportFeature.Union
+                )
+        );
 
         modelPackage = "models";
         apiPackage = "api";
@@ -133,7 +159,7 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
         languageSpecificPrimitives.add("float");
         languageSpecificPrimitives.add("double");
         languageSpecificPrimitives.add("char");
-        languageSpecificPrimitives.add("FILE");
+        languageSpecificPrimitives.add("binary_t*");
         languageSpecificPrimitives.add("Object");
         languageSpecificPrimitives.add("list_t*");
         languageSpecificPrimitives.add("list");
@@ -148,10 +174,11 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
         typeMapping.put("date", "char");
         typeMapping.put("DateTime", "char");
         typeMapping.put("boolean", "int");
-        typeMapping.put("file", "FILE");
-        typeMapping.put("binary", "char");
+        typeMapping.put("file", "binary_t*");
+        typeMapping.put("binary", "binary_t*");
         typeMapping.put("ByteArray", "char");
         typeMapping.put("UUID", "char");
+        typeMapping.put("URI", "char");
         typeMapping.put("array", "list");
         typeMapping.put("map", "list_t*");
         typeMapping.put("date-time", "char");
@@ -205,6 +232,9 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
         supportingFiles.add(new SupportingFile("cJSON.c.mustache", "external", "cJSON.c"));
         supportingFiles.add(new SupportingFile("cJSON.h.mustache", "external", "cJSON.h"));
 
+        // Object files in model folder
+        supportingFiles.add(new SupportingFile("object-body.mustache", "model", "object.c"));
+        supportingFiles.add(new SupportingFile("object-header.mustache", "model", "object.h"));
     }
 
     @Override
@@ -333,6 +363,9 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
     @Override
     public String toParamName(String name) {
         // should be the same as variable name
+        if (isReservedWord(name) || name.matches("^\\d.*")) {
+            name = escapeReservedWord(name);
+        }
         name = name.replaceAll("-","_");
         return name;
     }
@@ -412,11 +445,15 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
 
     @Override
     public String toEnumValue(String value, String datatype) {
+        value = value.replaceAll("-","_");
+        if (isReservedWord(value)) {
+            value = escapeReservedWord(value);
+        }
         if ("Integer".equals(datatype) || "Float".equals(datatype)) {
             return value;
         } else {
             if (value.matches("\\d.*")) { // starts with number
-                return "N" + escapeText(value);
+                return escapeReservedWord(escapeText(value));
             } else {
                 return escapeText(value);
             }
@@ -444,7 +481,7 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
         enumName = enumName.replaceFirst("_$", "");
 
         if (enumName.matches("\\d.*")) { // starts with number
-            return "N" + enumName;
+            return escapeReservedWord(enumName);
         } else {
             return enumName;
         }
@@ -457,7 +494,7 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
         enumName = enumName.replaceFirst("_$", "");
 
         if (enumName.matches("\\d.*")) { // starts with number
-            return "N" + enumName;
+            return escapeReservedWord(enumName);
         } else {
             return enumName;
         }
@@ -502,7 +539,10 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
 
     @Override
     public String toModelImport(String name) {
-        return "#include \"" +"../model/" + name + ".h\"";
+        if (importMapping.containsKey(name)) {
+            return "#include \"" +"../model/" + importMapping.get(name) + ".h\"";
+        } else
+            return "#include \"" +"../model/" + name + ".h\"";
     }
 
     @Override
@@ -593,6 +633,18 @@ public class CLibcurlClientCodegen extends DefaultCodegen implements CodegenConf
     @Override
     public String escapeUnsafeCharacters(String input) {
         return input.replace("=end", "=_end").replace("=begin", "=_begin");
+    }
+
+    @Override
+    public CodegenProperty fromProperty(String name, Schema p) {
+        CodegenProperty cm = super.fromProperty(name,p);
+        Schema ref = ModelUtils.getReferencedSchema(openAPI, p);
+        if (ref != null) {
+           if (ref.getEnum() != null) {
+               cm.isEnum = true;
+           }
+        }
+        return cm;
     }
 
 
