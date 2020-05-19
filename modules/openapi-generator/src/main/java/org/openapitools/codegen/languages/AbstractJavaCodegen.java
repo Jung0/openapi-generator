@@ -22,12 +22,10 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.util.SchemaTypeUtil;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -38,6 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -59,10 +59,11 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
     public static final String DISABLE_HTML_ESCAPING = "disableHtmlEscaping";
     public static final String BOOLEAN_GETTER_PREFIX = "booleanGetterPrefix";
     public static final String ADDITIONAL_MODEL_TYPE_ANNOTATIONS = "additionalModelTypeAnnotations";
+    public static final String DISCRIMINATOR_CASE_SENSITIVE = "discriminatorCaseSensitive";
 
     protected String dateLibrary = "threetenbp";
     protected boolean supportAsync = false;
-    protected boolean java8Mode = false;
+    protected boolean java8Mode = true;
     protected boolean withXml = false;
     protected String invokerPackage = "org.openapitools";
     protected String groupId = "org.openapitools";
@@ -81,9 +82,10 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
     protected String licenseUrl = "http://unlicense.org";
     protected String projectFolder = "src/main";
     protected String projectTestFolder = "src/test";
-    protected String sourceFolder = projectFolder + "/java";
+    protected String sourceFolder = projectFolder + File.separator + "java";
     protected String testFolder = projectTestFolder + "/java";
     protected boolean fullJavaUtil;
+    protected boolean discriminatorCaseSensitive = true; // True if the discriminator value lookup should be case-sensitive.
     protected String javaUtilPrefix = "";
     protected Boolean serializableModel = false;
     protected boolean serializeBigDecimalAsString = false;
@@ -167,6 +169,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         instantiationTypes.put("map", "HashMap");
         typeMapping.put("date", "Date");
         typeMapping.put("file", "File");
+        typeMapping.put("AnyType", "Object");
 
         cliOptions.add(new CliOption(CodegenConstants.MODEL_PACKAGE, CodegenConstants.MODEL_PACKAGE_DESC));
         cliOptions.add(new CliOption(CodegenConstants.API_PACKAGE, CodegenConstants.API_PACKAGE_DESC));
@@ -189,6 +192,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         cliOptions.add(CliOption.newBoolean(CodegenConstants.SERIALIZABLE_MODEL, CodegenConstants.SERIALIZABLE_MODEL_DESC, this.getSerializableModel()));
         cliOptions.add(CliOption.newBoolean(CodegenConstants.SERIALIZE_BIG_DECIMAL_AS_STRING, CodegenConstants.SERIALIZE_BIG_DECIMAL_AS_STRING_DESC, serializeBigDecimalAsString));
         cliOptions.add(CliOption.newBoolean(FULL_JAVA_UTIL, "whether to use fully qualified name for classes under java.util. This option only works for Java API client", fullJavaUtil));
+        cliOptions.add(CliOption.newBoolean(DISCRIMINATOR_CASE_SENSITIVE, "Whether the discriminator value lookup should be case-sensitive or not. This option only works for Java API client", discriminatorCaseSensitive));
         cliOptions.add(CliOption.newBoolean(CodegenConstants.HIDE_GENERATION_TIMESTAMP, CodegenConstants.HIDE_GENERATION_TIMESTAMP_DESC, this.isHideGenerationTimestamp()));
         cliOptions.add(CliOption.newBoolean(WITH_XML, "whether to include support for application/xml content type and include XML annotations in the model (works with libraries that provide support for JSON and XML)"));
 
@@ -202,7 +206,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         dateLibrary.setEnum(dateOptions);
         cliOptions.add(dateLibrary);
 
-        CliOption java8Mode = CliOption.newBoolean(JAVA8_MODE, "Option. Use Java8 classes instead of third party equivalents", this.java8Mode);
+        CliOption java8Mode = CliOption.newBoolean(JAVA8_MODE, "Use Java8 classes instead of third party equivalents. Starting in 5.x, JDK8 is the default and the support for JDK7, JDK6 has been dropped", this.java8Mode);
         Map<String, String> java8ModeOptions = new HashMap<>();
         java8ModeOptions.put("true", "Use Java 8 classes such as Base64");
         java8ModeOptions.put("false", "Various third party libraries as needed");
@@ -385,6 +389,15 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         if (additionalProperties.containsKey(FULL_JAVA_UTIL)) {
             this.setFullJavaUtil(Boolean.valueOf(additionalProperties.get(FULL_JAVA_UTIL).toString()));
         }
+        if (additionalProperties.containsKey(DISCRIMINATOR_CASE_SENSITIVE)) {
+            this.setDiscriminatorCaseSensitive(Boolean.valueOf(additionalProperties.get(DISCRIMINATOR_CASE_SENSITIVE).toString()));
+        } else {
+            // By default, the discriminator lookup should be case sensitive. There is nothing in the OpenAPI specification
+            // that indicates the lookup should be case insensitive. However, some implementations perform
+            // a case-insensitive lookup.
+            this.setDiscriminatorCaseSensitive(Boolean.TRUE);
+        }
+        additionalProperties.put(DISCRIMINATOR_CASE_SENSITIVE, this.discriminatorCaseSensitive);
 
         if (fullJavaUtil) {
             javaUtilPrefix = "java.util.";
@@ -468,10 +481,15 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         importMapping.put("com.fasterxml.jackson.annotation.JsonProperty", "com.fasterxml.jackson.annotation.JsonCreator");
 
         if (additionalProperties.containsKey(JAVA8_MODE)) {
+            LOGGER.info("containing java 8 mode ...");
             setJava8Mode(Boolean.parseBoolean(additionalProperties.get(JAVA8_MODE).toString()));
             if (java8Mode) {
-                additionalProperties.put("java8", "true");
+                LOGGER.info("containing java 8 mode to true...");
+                additionalProperties.put("java8", true);
+            } else {
+                additionalProperties.put("java8", false);
             }
+            LOGGER.info("containing java 8 mode to something {}...", java8Mode);
         }
 
         if (additionalProperties.containsKey(SUPPORT_ASYNC)) {
@@ -739,7 +757,9 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         if (ModelUtils.isArraySchema(p)) {
             Schema<?> items = getSchemaItems((ArraySchema) p);
             return getSchemaType(p) + "<" + getTypeDeclaration(ModelUtils.unaliasSchema(this.openAPI, items)) + ">";
-        } else if (ModelUtils.isMapSchema(p)) {
+        } else if (ModelUtils.isMapSchema(p) && !ModelUtils.isComposedSchema(p)) {
+            // Note: ModelUtils.isMapSchema(p) returns true when p is a composed schema that also defines
+            // additionalproperties: true
             Schema<?> inner = getSchemaAdditionalProperties(p);
             return getSchemaType(p) + "<String, " + getTypeDeclaration(ModelUtils.unaliasSchema(this.openAPI, inner)) + ">";
         }
@@ -777,7 +797,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
             }
 
             return String.format(Locale.ROOT, pattern, typeDeclaration);
-        } else if (ModelUtils.isMapSchema(schema)) {
+        } else if (ModelUtils.isMapSchema(schema) && !(schema instanceof ComposedSchema)) {
             final String pattern;
             if (fullJavaUtil) {
                 pattern = "new java.util.HashMap<%s>()";
@@ -829,12 +849,11 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         } else if (ModelUtils.isStringSchema(schema)) {
             if (schema.getDefault() != null) {
                 String _default;
-                if (schema.getDefault() instanceof Date){
+                if (schema.getDefault() instanceof Date) {
                     Date date = (Date) schema.getDefault();
                     LocalDate localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
                     return String.format(Locale.ROOT, localDate.toString(), "");
-                }
-                else{
+                } else {
                     _default = (String) schema.getDefault();
                 }
                 if (schema.getEnum() == null) {
@@ -1099,7 +1118,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         }
 
         // TODO: Setting additionalProperties is not the responsibility of this method. These side-effects should be moved elsewhere to prevent unexpected behaviors.
-        if(artifactVersion == null) {
+        if (artifactVersion == null) {
             // If no artifactVersion is provided in additional properties, version from API specification is used.
             // If none of them is provided then fallbacks to default version
             if (additionalProperties.containsKey(CodegenConstants.ARTIFACT_VERSION) && additionalProperties.get(CodegenConstants.ARTIFACT_VERSION) != null) {
@@ -1427,6 +1446,15 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
 
     public void setFullJavaUtil(boolean fullJavaUtil) {
         this.fullJavaUtil = fullJavaUtil;
+    }
+
+    /**
+     * Set whether discriminator value lookup is case-sensitive or not.
+     *
+     * @param discriminatorCaseSensitive true if the discriminator value lookup should be case sensitive.
+     */
+    public void setDiscriminatorCaseSensitive(boolean discriminatorCaseSensitive) {
+        this.discriminatorCaseSensitive = discriminatorCaseSensitive;
     }
 
     public void setWithXml(boolean withXml) {

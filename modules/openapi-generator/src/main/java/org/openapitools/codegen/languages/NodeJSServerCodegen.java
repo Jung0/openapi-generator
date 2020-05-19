@@ -116,7 +116,7 @@ public class NodeJSServerCodegen extends DefaultCodegen implements CodegenConfig
         setReservedWordsLowerCase(
                 Arrays.asList(
                         "break", "case", "class", "catch", "const", "continue", "debugger",
-                        "default", "delete", "do", "else", "export", "extends", "finally",
+                        "default", "delete", "do", "else", "enum", "export", "extends", "finally",
                         "for", "function", "if", "import", "in", "instanceof", "let", "new",
                         "return", "super", "switch", "this", "throw", "try", "typeof", "var",
                         "void", "while", "with", "yield")
@@ -362,12 +362,16 @@ public class NodeJSServerCodegen extends DefaultCodegen implements CodegenConfig
                 "openapi.yaml")
         );
         if (getGoogleCloudFunctions()) {
-            writeOptional(outputFolder, new SupportingFile("index-gcf.mustache", "", "index.js"));
+            supportingFiles.add(new SupportingFile("index-gcf.mustache", "", "index.js")
+                    .doNotOverwrite());
         } else {
-            writeOptional(outputFolder, new SupportingFile("index.mustache", "", "index.js"));
+            supportingFiles.add(new SupportingFile("index.mustache", "", "index.js")
+                    .doNotOverwrite());
         }
-        writeOptional(outputFolder, new SupportingFile("package.mustache", "", "package.json"));
-        writeOptional(outputFolder, new SupportingFile("README.mustache", "", "README.md"));
+        supportingFiles.add(new SupportingFile("package.mustache", "", "package.json")
+                .doNotOverwrite());
+        supportingFiles.add(new SupportingFile("README.mustache", "", "README.md")
+                .doNotOverwrite());
         if (GlobalSettings.getProperty("noservice") == null) {
             apiTemplateFiles.put(
                     "service.mustache",   // the template to use

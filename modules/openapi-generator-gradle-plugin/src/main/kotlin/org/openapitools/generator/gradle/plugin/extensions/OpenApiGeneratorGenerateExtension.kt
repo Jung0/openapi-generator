@@ -182,7 +182,7 @@ open class OpenApiGeneratorGenerateExtension(project: Project) {
     val releaseNote = project.objects.property<String?>()
 
     /**
-     * HTTP user agent, e.g. codegen_csharp_api_client, default to 'OpenAPI-Generator/{packageVersion}}/{language}'
+     * HTTP user agent, e.g. codegen_csharp_api_client, default to 'OpenAPI-Generator/{packageVersion}/{language}'
      */
     val httpUserAgent = project.objects.property<String?>()
 
@@ -306,6 +306,11 @@ open class OpenApiGeneratorGenerateExtension(project: Project) {
      * A map of options specific to a generator.
      */
     val configOptions = project.objects.mapProperty<String, String>()
+
+    /**
+     * Templating engine: "mustache" (default) or "handlebars" (beta)
+     */
+    val engine = project.objects.property<String?>()
 
     init {
         applyDefaults()

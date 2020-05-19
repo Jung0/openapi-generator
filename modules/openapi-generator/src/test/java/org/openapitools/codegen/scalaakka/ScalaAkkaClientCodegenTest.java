@@ -335,10 +335,11 @@ public class ScalaAkkaClientCodegenTest {
         Assert.assertEquals(Sets.intersection(cm.imports, Sets.newHashSet("Map", "Children")).size(), 1);
     }
 
-    @Test(description = "validate codegen output")
+    @Test(description = "validate codegen joda output")
     public void codeGenerationTest() throws Exception {
         Map<String, Object> properties = new HashMap<>();
         properties.put("mainPackage", "hello.world");
+        properties.put("dateLibrary", "joda");
 
         File output = Files.createTempDirectory("test").toFile();
         output.deleteOnExit();
@@ -356,13 +357,44 @@ public class ScalaAkkaClientCodegenTest {
         generator.opts(clientOptInput).generate();
 
         Map<String, String> generatedFiles = generator.getFiles();
-        Assert.assertEquals(generatedFiles.size(), 13);
+        Assert.assertEquals(generatedFiles.size(), 14);
 
         final String someObjFilename = new File(output, "src/main/scala/hello/world/model/SomeObj.scala").getAbsolutePath().replace("\\", "/");
         Assert.assertEquals(
                 generatedFiles.get(someObjFilename),
                 Resources.toString(Resources.getResource("codegen/scala/SomeObj.scala.txt"), StandardCharsets.UTF_8));
     }
+
+    @Test(description = "validate codegen java8 output")
+    public void codeGenerationJava8Test() throws Exception {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("mainPackage", "hello.world");
+        properties.put("dateLibrary", "java8");
+
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final DefaultCodegen codegen = new ScalaAkkaClientCodegen();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName(codegen.getName())
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/scala_reserved_words.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+        MockDefaultGenerator generator = new MockDefaultGenerator();
+        generator.opts(clientOptInput).generate();
+
+        Map<String, String> generatedFiles = generator.getFiles();
+        Assert.assertEquals(generatedFiles.size(), 14);
+
+        final String someObjFilename = new File(output, "src/main/scala/hello/world/model/SomeObj.scala").getAbsolutePath().replace("\\", "/");
+        Assert.assertEquals(
+                generatedFiles.get(someObjFilename),
+                Resources.toString(Resources.getResource("codegen/scala/JavaTimeObj.scala.txt"), StandardCharsets.UTF_8));
+    }
+
 
     @Test(description = "strip model name")
     public void stripModelNameTest() throws Exception {
@@ -386,5 +418,68 @@ public class ScalaAkkaClientCodegenTest {
         Assert.assertEquals(cm.classname, "NonStrippedModelName");
         Assert.assertEquals(cm.classFilename, "NonStrippedModelName");
 
+    }
+
+    @Test(description = "override only mainPackage")
+    public void mainPackageTest() throws Exception {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("mainPackage", "hello.world");
+
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final DefaultCodegen codegen = new ScalaAkkaClientCodegen();
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName(codegen.getName())
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/scala_reserved_words.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+        MockDefaultGenerator generator = new MockDefaultGenerator();
+        Generator gen = generator.opts(clientOptInput);
+        gen.generate();
+
+        Map<String, String> generatedFiles = generator.getFiles();
+        Assert.assertEquals(generatedFiles.size(), 14);
+
+        String outputPath = output.getAbsolutePath().replace("\\", "/");
+
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/model/SomeObj.scala"));
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/core/ApiSettings.scala"));
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/api/PingApi.scala"));
+    }
+
+    @Test(description = "override api packages")
+    public void overridePackagesTest() throws Exception {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("mainPackage", "hello.world");
+        properties.put("apiPackage", "hello.world.api.package");
+        properties.put("modelPackage", "hello.world.model.package");
+        properties.put("invokerPackage", "hello.world.package.invoker");
+
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final DefaultCodegen codegen = new ScalaAkkaClientCodegen();
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName(codegen.getName())
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/scala_reserved_words.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+        MockDefaultGenerator generator = new MockDefaultGenerator();
+        Generator gen = generator.opts(clientOptInput);
+        gen.generate();
+
+        Map<String, String> generatedFiles = generator.getFiles();
+        Assert.assertEquals(generatedFiles.size(), 14);
+
+        String outputPath = output.getAbsolutePath().replace("\\", "/");
+
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/model/package/SomeObj.scala"), "Model package is correct");
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/package/invoker/ApiSettings.scala"), "Invoker package is correct");
+        Assert.assertTrue(generatedFiles.containsKey(outputPath + "/src/main/scala/hello/world/api/package/PingApi.scala"), "Api package is correct");
     }
 }
